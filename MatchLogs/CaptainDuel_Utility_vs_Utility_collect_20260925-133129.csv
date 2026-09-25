@@ -1,0 +1,3 @@
+team,brain,rounds_won,rounds_drawn,kills,deaths,first_contact,dumb_moments,exposure_s,center_s,avg_decision_ms,peak_decision_ms
+0,Utility+explore,15,0,15,15,15,28,246.4,0.0,0.0087,0.0792
+1,Utility+explore,15,0,15,15,15,26,246.3,7.8,0.0090,1.3823
