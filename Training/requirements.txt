@@ -1,3 +1,9 @@
 # Phase 2: reading and checking the dataset.
 numpy>=2.0
-# Phase 3 adds torch. Keep this venv on Python 3.12 -- the machine default is 3.14.
+# Phase 3: world model training and ONNX export. Keep this venv on Python 3.12 --
+# the machine default is 3.14. torch comes from the CUDA index, not PyPI:
+#   .venv\Scripts\python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
+torch>=2.11
+onnx>=1.23
+onnxruntime>=1.30
+onnxscript

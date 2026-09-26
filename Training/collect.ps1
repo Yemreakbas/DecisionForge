@@ -17,7 +17,13 @@ param(
     [int]$FirstSeed = 1,
     [ValidateSet("duel", "squad")][string]$Format = "duel",
     [double]$Explore = 0.012,
-    [string]$Out = (Join-Path $PSScriptRoot "..\Datasets")
+    [string]$Out = (Join-Path $PSScriptRoot "..\Datasets"),
+    # Collect other arenas into a subfolder (e.g. -Out Datasets\warehouse): find_runs
+    # only looks one level down, so the top level stays the default training set.
+    [ValidateSet("octagon", "warehouse", "divide", "procedural")][string]$Arena = "octagon",
+    # Procedural only: instance i builds layout FirstLayoutSeed + i, so one call
+    # collects as many different arenas as it has instances.
+    [int]$FirstLayoutSeed = 1
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +45,8 @@ for ($i = 0; $i -lt $Instances; $i++) {
     # One quoted string rather than an array: Windows PowerShell passes array
     # elements unquoted, and this project lives under a path with a space in it.
     $arguments = "-batchmode -nographics -collect -rounds $Rounds -seed $seed -format $Format " +
-                 "-explore $exploreText -out `"$Out`" -logFile `"$log`""
+                 "-arena $Arena -explore $exploreText -out `"$Out`" -logFile `"$log`""
+    if ($Arena -eq "procedural") { $arguments += " -layoutseed $($FirstLayoutSeed + $i)" }
 
     $process = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru -WindowStyle Hidden
     # Touching the handle now is what makes ExitCode readable once the process ends.

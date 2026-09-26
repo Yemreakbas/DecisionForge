@@ -14,7 +14,8 @@ namespace JevNpcBrain.Match
     using Reflex;
     using Tactical;
 
-    public enum BrainKind { Utility, Jev }
+    /// <summary>Serialized by value in the scene: append only.</summary>
+    public enum BrainKind { Utility, Jev, UtilityStopToShoot }
 
     public enum MatchFormat { CaptainDuel, Squad }
 
@@ -32,6 +33,26 @@ namespace JevNpcBrain.Match
         public MatchFormat Format = MatchFormat.CaptainDuel;
         public BrainKind TeamABrain = BrainKind.Utility;
         public BrainKind TeamBBrain = BrainKind.Utility;
+
+        [Tooltip("World model for BrainKind.Jev teams (Assets/_Project/Models/<checkpoint>/JevModel.asset).")]
+        public JevModelAsset JevModel;
+
+        [Tooltip("Other world models the build carries, picked by checkpoint name with " +
+                 "'-jevmodel <checkpoint>'. Only referenced models make it into a player.")]
+        public JevModelAsset[] AlternativeJevModels;
+
+        [Tooltip("Draw every JEV brain's imagined futures. Presentation only.")]
+        public bool ShowImagination = true;
+
+        [Tooltip("Ablation: overrides Weapon.MovingSpreadPenalty for every agent. Negative keeps " +
+                 "the weapon's own value (the real rules). CSVs of an override are tagged _spread<X>.")]
+        public float MovingSpreadOverride = -1f;
+
+        [Tooltip("Auto: GPU compute when a graphics device exists, CPU otherwise (-nographics). " +
+                 "In the editor the CPU backend measured ~240 ms per decision against ~9 ms on GPU.")]
+        public JevBackend JevInference = JevBackend.Auto;
+
+        public enum JevBackend { Auto, CPU, GPUCompute }
 
         [Header("Look")]
         [Tooltip("Optional humanoid rig with an Animator. Empty = procedural mascot. " +
@@ -110,6 +131,11 @@ namespace JevNpcBrain.Match
 
         private bool _quitWhenDone;
 
+        /// <summary>Headless A/B run (-evaluate): fixed step like collection, no recording.</summary>
+        private bool _evaluate;
+
+        private bool FixedStep => CollectDataset || _evaluate;
+
         private IEnumerator Start()
         {
             ApplyCommandLine();
@@ -119,7 +145,7 @@ namespace JevNpcBrain.Match
             // intend to leave thousands of rounds grinding in the background.
             Application.runInBackground = true;
 
-            if (CollectDataset)
+            if (FixedStep)
             {
                 // Fixed 60 Hz steps, as fast as the machine allows. The tactical
                 // tick then lands every 0.1 s of game time exactly. On a scaled,
@@ -138,6 +164,10 @@ namespace JevNpcBrain.Match
             if (Arena == null) Arena = FindAnyObjectByType<ArenaBuilder>();
             if (Metrics == null) Metrics = gameObject.AddComponent<MatchMetrics>();
             if (Cameras == null) Cameras = FindAnyObjectByType<CameraDirector>();
+
+            bool anyJev = TeamABrain == BrainKind.Jev || TeamBBrain == BrainKind.Jev;
+            if (anyJev && ShowImagination && !Application.isBatchMode && GetComponent<ImaginationTrails>() == null)
+                gameObject.AddComponent<ImaginationTrails>();
 
             // The arena builds in its own Awake; wait a frame so the layout exists.
             yield return null;
@@ -206,6 +236,23 @@ namespace JevNpcBrain.Match
                     case "-out":
                         if (!string.IsNullOrEmpty(value)) DatasetFolder = value;
                         break;
+                    case "-evaluate":
+                        _evaluate = true;
+                        _quitWhenDone = true;
+                        Application.logMessageReceived += QuitOnException;
+                        break;
+                    case "-braina":
+                        if (value != null) TeamABrain = ParseBrain(value, TeamABrain);
+                        break;
+                    case "-brainb":
+                        if (value != null) TeamBBrain = ParseBrain(value, TeamBBrain);
+                        break;
+                    case "-spreadpenalty":
+                        if (float.TryParse(value, NumberStyles.Float, c, out float penalty)) MovingSpreadOverride = penalty;
+                        break;
+                    case "-jevmodel":
+                        _jevModelName = value;
+                        break;
                 }
             }
         }
@@ -220,14 +267,63 @@ namespace JevNpcBrain.Match
             if (type == LogType.Exception) Application.Quit(1);
         }
 
+        private Unity.InferenceEngine.BackendType ResolveJevBackend()
+        {
+            bool gpu = JevInference == JevBackend.GPUCompute
+                || (JevInference == JevBackend.Auto && SystemInfo.supportsComputeShaders
+                    && SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null);
+            return gpu ? Unity.InferenceEngine.BackendType.GPUCompute : Unity.InferenceEngine.BackendType.CPU;
+        }
+
+        private static BrainKind ParseBrain(string value, BrainKind fallback)
+        {
+            switch (value.ToLowerInvariant())
+            {
+                case "jev": return BrainKind.Jev;
+                case "utility": return BrainKind.Utility;
+                case "stopshoot": return BrainKind.UtilityStopToShoot;
+                default:
+                    Debug.LogWarning($"[MatchDirector] Unknown brain '{value}', keeping {fallback}.");
+                    return fallback;
+            }
+        }
+
+        /// <summary>A Jev label names its model: two checkpoints are two different brains.</summary>
         private string BrainLabel(BrainKind kind)
-            => CollectDataset && ExplorationRate > 0f ? kind + "+explore" : kind.ToString();
+        {
+            string label = kind == BrainKind.Jev && _jevRuntime != null
+                ? "Jev:" + _jevRuntime.Contract.checkpoint
+                : kind.ToString();
+            return CollectDataset && ExplorationRate > 0f ? label + "+explore" : label;
+        }
+
+        private string _jevModelName;
+
+        /// <summary>JevModel, or the model -jevmodel names among it and the alternatives.</summary>
+        private JevModelAsset SelectJevModel()
+        {
+            if (string.IsNullOrEmpty(_jevModelName)) return JevModel;
+
+            var candidates = new List<JevModelAsset> { JevModel };
+            if (AlternativeJevModels != null) candidates.AddRange(AlternativeJevModels);
+            foreach (var model in candidates)
+                if (model != null && model.LoadContract().checkpoint == _jevModelName) return model;
+
+            throw new System.InvalidOperationException(
+                $"[MatchDirector] -jevmodel '{_jevModelName}' is neither JevModel nor in AlternativeJevModels.");
+        }
 
         /// <summary>Leaving play mode must not leave the editor stepping in fixed time.</summary>
         private void OnDestroy()
         {
-            if (CollectDataset) Time.captureDeltaTime = 0f;
+            if (FixedStep) Time.captureDeltaTime = 0f;
+
+            // Inference Engine workers hold native memory; release it with the match.
+            _jevRuntime?.Dispose();
+            _jevRuntime = null;
         }
+
+        private JevRuntime _jevRuntime;
 
         private int AgentsPerTeam => Format == MatchFormat.CaptainDuel ? 1 : 3;
 
@@ -266,16 +362,32 @@ namespace JevNpcBrain.Match
         }
 
         /// <summary>
-        /// Phase 4 swaps the Jev branch for the real planner. Until then it falls
-        /// back to the baseline and says so, rather than silently pretending.
+        /// A Jev team without a model has no brain to run: that is a setup error,
+        /// and quietly playing the baseline under a "Jev" label would poison every
+        /// number downstream, so it throws.
         /// </summary>
         private ITacticalBrain MakeBrain(BrainKind kind, bool captain, int agentId)
         {
+            ITacticalBrain brain;
             if (kind == BrainKind.Jev)
-                Debug.LogWarning("[MatchDirector] JevBrain not implemented yet (phase 4). " +
-                                 "Falling back to UtilityBrain for this team.");
-
-            ITacticalBrain brain = new UtilityBrain(captain ? UtilityBrain.Weights.Captain() : null);
+            {
+                if (JevModel == null)
+                    throw new System.InvalidOperationException(
+                        "[MatchDirector] A team is set to Jev but no JevModel is assigned.");
+                if (_jevRuntime == null)
+                {
+                    var backend = ResolveJevBackend();
+                    _jevRuntime = new JevRuntime(SelectJevModel(), backend);
+                    Debug.Log($"[MatchDirector] JEV model '{_jevRuntime.Contract.checkpoint}' on {backend}.");
+                }
+                brain = new JevBrain(_jevRuntime, captain ? JevBrain.Weights.Captain() : null);
+            }
+            else
+            {
+                var weights = captain ? UtilityBrain.Weights.Captain() : new UtilityBrain.Weights();
+                if (kind == BrainKind.UtilityStopToShoot) weights = UtilityBrain.Weights.StopToShoot(weights);
+                brain = new UtilityBrain(weights);
+            }
 
             // Collection runs only, and every agent alike -- see ExploringBrain.
             if (CollectDataset && ExplorationRate > 0f)
@@ -302,6 +414,7 @@ namespace JevNpcBrain.Match
 
             var health = root.AddComponent<Damageable>();
             var weapon = eye.gameObject.AddComponent<Weapon>();
+            if (MovingSpreadOverride >= 0f) weapon.MovingSpreadPenalty = MovingSpreadOverride;
             var motor = root.AddComponent<ReflexMotor>();
             motor.Eye = eye;
             motor.EnableVault = EnableAdvancedMovement;
@@ -394,6 +507,8 @@ namespace JevNpcBrain.Match
             RoundStarted?.Invoke(round);
 
             float deadline = Time.time + RoundTimeLimit;
+            if (FixedStep)
+                Debug.Log($"[Round] {round} start aliveA={CountAlive(0)} aliveB={CountAlive(1)}");
 
             while (Time.time < deadline)
             {
@@ -405,8 +520,15 @@ namespace JevNpcBrain.Match
 
                 if (aliveA == 0 || aliveB == 0)
                 {
+                    // Both sides wiped in the same frame (a trade) is a draw. It used
+                    // to be neither a win nor a draw, so such rounds silently fell
+                    // out of the CSV totals; the 19-21 calibration had none.
                     int winner = aliveA == aliveB ? -1 : aliveA > 0 ? 0 : 1;
                     if (winner >= 0) Metrics.RecordRoundWin(winner);
+                    else Metrics.RoundsDrawn++;
+                    if (FixedStep)
+                        Debug.Log($"[Round] {round} elimination winner={winner} aliveA={aliveA} aliveB={aliveB} " +
+                                  $"t={RoundTimeLimit - (deadline - Time.time):F1}");
                     RoundEnded?.Invoke(round, winner);
                     yield break;
                 }
@@ -414,7 +536,9 @@ namespace JevNpcBrain.Match
                 yield return null;
             }
 
-            RoundEnded?.Invoke(round, ResolveTimeout());
+            int timeoutWinner = ResolveTimeout();
+            if (FixedStep) Debug.Log($"[Round] {round} timeout winner={timeoutWinner}");
+            RoundEnded?.Invoke(round, timeoutWinner);
         }
 
         /// <summary>
@@ -538,9 +662,19 @@ namespace JevNpcBrain.Match
 
                 // Collection runs explore, so their numbers are not the baseline's;
                 // the tag keeps them from ever being read as an evaluation result.
-                string tag = CollectDataset ? "_collect" : "";
+                // Headless runs carry their seed: parallel instances finishing in the
+                // same second would otherwise overwrite each other's file.
+                string tag = CollectDataset ? "_collect" : _evaluate ? "_eval" : "";
+                // Octagon keeps the historical names; any other arena is named in the file.
+                var arena = ArenaLayout.Current;
+                if (arena != null && arena.Name != "Octagon") tag += "_" + arena.Name;
+
+                // A rules ablation must never be read as a result under the real rules.
+                if (MovingSpreadOverride >= 0f)
+                    tag += "_spread" + MovingSpreadOverride.ToString("0.##", CultureInfo.InvariantCulture);
+                string seed = FixedStep ? $"_seed{Seed}" : "";
                 string file = System.IO.Path.Combine(directory,
-                    $"{Format}_{TeamABrain}_vs_{TeamBBrain}{tag}_{System.DateTime.Now:yyyyMMdd-HHmmss}.csv");
+                    $"{Format}_{TeamABrain}_vs_{TeamBBrain}{tag}_{System.DateTime.Now:yyyyMMdd-HHmmss}{seed}.csv");
 
                 System.IO.File.WriteAllText(file, csv);
                 Debug.Log($"[MatchDirector] Wrote {file}");

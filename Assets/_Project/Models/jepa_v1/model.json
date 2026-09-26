@@ -1,0 +1,257 @@
+{
+ "schema": "jev-model/1",
+ "checkpoint": "jepa_v1",
+ "exported_utc": "2026-09-25T17:52:49Z",
+ "dataset_schema": "jev-dataset/1",
+ "train_runs": [
+  "CaptainDuel_Utility-vs-Utility_20260925-135234_seed101",
+  "CaptainDuel_Utility-vs-Utility_20260925-135234_seed102",
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1001",
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1002",
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1003"
+ ],
+ "val_runs": [
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1004"
+ ],
+ "tick_seconds": 0.1,
+ "grid": {
+  "channels": [
+   "ObstacleHeight",
+   "CoverQuality",
+   "EnemyBelief",
+   "AllyPresence",
+   "NoiseHeat",
+   "Visibility",
+   "ThreatExposure"
+  ],
+  "size": 32,
+  "cell_size": 1.25,
+  "frame": "agent-centred, world-axis-aligned",
+  "log1p_channels": [
+   "EnemyBelief",
+   "AllyPresence",
+   "NoiseHeat"
+  ]
+ },
+ "self_fields": [
+  "Health01",
+  "Ammo01",
+  "IsReloading",
+  "ReloadProgress01",
+  "Stance",
+  "Speed01",
+  "FacingSin",
+  "FacingCos",
+  "TimeSinceEnemySeen01",
+  "TimeSinceDamaged01",
+  "HasLineOfSight",
+  "VisibleEnemies01",
+  "AlliesAlive01",
+  "AllyAverageHealth01",
+  "TeamScore01",
+  "EnemyScore01",
+  "MatchTimeRemaining01",
+  "InCover01",
+  "NearestKnownEnemyDistance01",
+  "Suppression01",
+  "LastIntent01",
+  "IntentHoldTime01",
+  "DistanceToCenter01",
+  "InCenterZone"
+ ],
+ "masked_self_fields": [
+  "LastIntent01",
+  "IntentHoldTime01"
+ ],
+ "intents": [
+  "Hold",
+  "PushCoverForward",
+  "PushCoverFlank",
+  "Retreat",
+  "FlankLeft",
+  "FlankRight",
+  "Suppress",
+  "Peek",
+  "RegroupAlly",
+  "ContestCenter"
+ ],
+ "latent_dim": 128,
+ "probes": [
+  {
+   "name": "health",
+   "description": "Health01 now",
+   "display_only": false
+  },
+  {
+   "name": "in_cover",
+   "description": "InCover01 now",
+   "display_only": false
+  },
+  {
+   "name": "line_of_sight",
+   "description": "HasLineOfSight now",
+   "display_only": false
+  },
+  {
+   "name": "exposure",
+   "description": "ThreatExposure under the agent (grid centre 2x2) now",
+   "display_only": false
+  },
+  {
+   "name": "in_center",
+   "description": "InCenterZone now",
+   "display_only": false
+  },
+  {
+   "name": "hurt_soon",
+   "description": "loses health or dies within the next 1.0 s",
+   "display_only": false
+  },
+  {
+   "name": "death_soon",
+   "description": "dies within the next 2.0 s",
+   "display_only": false
+  },
+  {
+   "name": "round_won",
+   "description": "the agent's team wins this round (masked on draws)",
+   "display_only": false
+  },
+  {
+   "name": "pos_x",
+   "description": "world x, -20..20 m mapped to 0..1 (display only)",
+   "display_only": true
+  },
+  {
+   "name": "pos_z",
+   "description": "world z, -20..20 m mapped to 0..1 (display only)",
+   "display_only": true
+  }
+ ],
+ "position_probes": {
+  "x": "pos_x",
+  "z": "pos_z",
+  "world_metres": "(p - 0.5) * 2 * half_extent",
+  "half_extent": 20.0
+ },
+ "opset": 15,
+ "graphs": {
+  "encoder": {
+   "file": "encoder.onnx",
+   "inputs": {
+    "grid": [
+     -1,
+     7,
+     32,
+     32
+    ],
+    "self": [
+     -1,
+     24
+    ]
+   },
+   "outputs": {
+    "latent": [
+     -1,
+     128
+    ]
+   }
+  },
+  "predictor": {
+   "file": "predictor.onnx",
+   "inputs": {
+    "latent": [
+     -1,
+     128
+    ],
+    "intent": [
+     -1,
+     10
+    ]
+   },
+   "outputs": {
+    "next_latent": [
+     -1,
+     128
+    ]
+   }
+  },
+  "probes": {
+   "file": "probes.onnx",
+   "inputs": {
+    "latent": [
+     -1,
+     128
+    ]
+   },
+   "outputs": {
+    "probes": [
+     -1,
+     10
+    ]
+   }
+  },
+  "imagine": {
+   "file": "imagine.onnx",
+   "horizon": 15,
+   "inputs": {
+    "latent": [
+     1,
+     128
+    ],
+    "intents": [
+     -1,
+     15,
+     10
+    ]
+   },
+   "outputs": {
+    "probes": [
+     -1,
+     15,
+     10
+    ]
+   }
+  }
+ },
+ "checks": {
+  "encoder": {
+   "max_abs_error": 2.346932888031006e-06,
+   "ort_cpu_ms": 0.21880850000343344
+  },
+  "predictor": {
+   "max_abs_error": 7.152557373046875e-07,
+   "ort_cpu_ms": 0.22568150000552123
+  },
+  "probes": {
+   "max_abs_error": 1.7881393432617188e-07,
+   "ort_cpu_ms": 0.05061750000095344
+  },
+  "imagine": {
+   "max_abs_error": 3.5762786865234375e-07,
+   "ort_cpu_ms": 1.1837345000003552
+  }
+ },
+ "evaluation": {
+  "rollout_ratio_to_copy": {
+   "1": 0.3101408999386769,
+   "2": 0.20855243077798163,
+   "3": 0.1940524304396797,
+   "4": 0.20434575570067978,
+   "5": 0.22334585621419328,
+   "6": 0.24031636952591115,
+   "7": 0.2508068777071846,
+   "8": 0.2591153765517605,
+   "9": 0.26851885760066685,
+   "10": 0.2768264668468539,
+   "11": 0.28615683620447835,
+   "12": 0.2933371844441708,
+   "13": 0.3016746632799797,
+   "14": 0.3104358459486059,
+   "15": 0.3202764752120554
+  },
+  "intent_id_accuracy": 0.837625,
+  "intent_id_balanced_accuracy": 0.6022403807068397,
+  "windows": 20000
+ }
+}

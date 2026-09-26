@@ -118,3 +118,16 @@ class Run:
 def find_runs(root) -> list:
     """Every run folder under ``root``, i.e. every folder holding a run.json."""
     return sorted(path.parent for path in Path(root).glob("*/run.json"))
+
+
+def find_run_by_name(root, name):
+    """A run folder by name, up to two levels under ``root`` (Datasets/warehouse/...).
+
+    For finding the runs a checkpoint recorded -- never for choosing training
+    data, which stays explicit (``find_runs`` on the folders given).
+    """
+    for pattern in ("*/run.json", "*/*/run.json"):
+        for path in Path(root).glob(pattern):
+            if path.parent.name == name:
+                return path.parent
+    return None

@@ -21,6 +21,18 @@ namespace JevNpcBrain.EditorTools
         [MenuItem("JEV/Build Data Collector")]
         public static void Build()
         {
+            // A dirty open scene makes Unity stop the build on a modal "Scene(s) Have
+            // Been Modified" dialog -- invisible to anyone driving the editor over MCP,
+            // which then waits on a build that never starts. Refuse instead, loudly.
+            for (int i = 0; i < UnityEditor.SceneManagement.EditorSceneManager.sceneCount; i++)
+            {
+                var scene = UnityEditor.SceneManagement.EditorSceneManager.GetSceneAt(i);
+                if (!scene.isDirty) continue;
+                Debug.LogError($"[CollectorBuild] Build refused: '{scene.path}' has unsaved changes. " +
+                               "Save or revert it first -- the player is built from the scene on disk.");
+                return;
+            }
+
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = new[] { ScenePath },

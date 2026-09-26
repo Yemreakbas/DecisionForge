@@ -170,17 +170,25 @@ namespace JevNpcBrain.Match
         {
             var c = CultureInfo.InvariantCulture;
             var sb = new StringBuilder();
+            // Columns are append-only, like the observation contract: older CSVs
+            // stay readable by the same parser.
             sb.AppendLine("team,brain,rounds_won,rounds_drawn,kills,deaths,first_contact," +
-                          "dumb_moments,exposure_s,center_s,avg_decision_ms,peak_decision_ms");
+                          "dumb_moments,exposure_s,center_s,avg_decision_ms,peak_decision_ms,safety_vetoes");
 
             for (int t = 0; t < 2; t++)
             {
                 var s = Teams[t];
+
+                // Agents live for the whole match, so their tallies are this match's.
+                int vetoes = 0;
+                foreach (var agent in NpcAgent.All)
+                    if (agent.Team == t) vetoes += agent.Vetoes;
+
                 sb.AppendLine(string.Format(c,
-                    "{0},{1},{2},{3},{4},{5},{6},{7},{8:F1},{9:F1},{10:F4},{11:F4}",
+                    "{0},{1},{2},{3},{4},{5},{6},{7},{8:F1},{9:F1},{10:F4},{11:F4},{12}",
                     t, s.BrainLabel, s.RoundsWon, RoundsDrawn, s.Kills, s.Deaths,
                     s.FirstContactWins, s.DumbMoments, s.ExposureSeconds, s.CenterSeconds,
-                    s.AverageDecisionMs, s.PeakDecisionMs));
+                    s.AverageDecisionMs, s.PeakDecisionMs, vetoes));
             }
 
             return sb.ToString();

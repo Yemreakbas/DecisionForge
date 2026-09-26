@@ -1,0 +1,286 @@
+{
+ "schema": "jev-model/1",
+ "checkpoint": "jepa_v3",
+ "exported_utc": "2026-09-26T13:03:31Z",
+ "dataset_schema": "jev-dataset/1",
+ "train_runs": [
+  "CaptainDuel_Utility-vs-Utility_20260925-135234_seed101",
+  "CaptainDuel_Utility-vs-Utility_20260925-135234_seed102",
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1001",
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1002",
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1003",
+  "CaptainDuel_Utility-vs-Utility_20260926-035004_seed2101",
+  "CaptainDuel_Utility-vs-Utility_20260926-035004_seed2102",
+  "CaptainDuel_Utility-vs-Utility_20260926-035004_seed2103",
+  "CaptainDuel_Utility-vs-Utility_20260926-035004_seed2104",
+  "CaptainDuel_Utility-vs-Utility_20260926-153938_seed4103",
+  "CaptainDuel_Utility-vs-Utility_20260926-153938_seed4104",
+  "CaptainDuel_Utility-vs-Utility_20260926-153939_seed4101",
+  "CaptainDuel_Utility-vs-Utility_20260926-153939_seed4102",
+  "CaptainDuel_Utility-vs-Utility_20260926-153950_seed4105",
+  "CaptainDuel_Utility-vs-Utility_20260926-153950_seed4106",
+  "CaptainDuel_Utility-vs-Utility_20260926-153950_seed4107",
+  "CaptainDuel_Utility-vs-Utility_20260926-153950_seed4108",
+  "CaptainDuel_Utility-vs-Utility_20260926-154009_seed4109",
+  "CaptainDuel_Utility-vs-Utility_20260926-154009_seed4110",
+  "CaptainDuel_Utility-vs-Utility_20260926-154009_seed4111",
+  "CaptainDuel_Utility-vs-Utility_20260926-154009_seed4112",
+  "CaptainDuel_Utility-vs-Utility_20260926-154024_seed4113",
+  "CaptainDuel_Utility-vs-Utility_20260926-154025_seed4114",
+  "CaptainDuel_Utility-vs-Utility_20260926-154025_seed4115",
+  "CaptainDuel_Utility-vs-Utility_20260926-154025_seed4116",
+  "CaptainDuel_Utility-vs-Utility_20260926-154047_seed4117",
+  "CaptainDuel_Utility-vs-Utility_20260926-154047_seed4118",
+  "CaptainDuel_Utility-vs-Utility_20260926-154047_seed4119",
+  "CaptainDuel_Utility-vs-Utility_20260926-154047_seed4120",
+  "CaptainDuel_Utility-vs-Utility_20260926-154105_seed4121",
+  "CaptainDuel_Utility-vs-Utility_20260926-154105_seed4122",
+  "CaptainDuel_Utility-vs-Utility_20260926-154105_seed4123"
+ ],
+ "val_runs": [
+  "CaptainDuel_Utility-vs-Utility_20260925-135434_seed1004",
+  "CaptainDuel_Utility-vs-Utility_20260926-033627_seed2001",
+  "CaptainDuel_Utility-vs-Utility_20260926-154105_seed4124"
+ ],
+ "tick_seconds": 0.1,
+ "grid": {
+  "channels": [
+   "ObstacleHeight",
+   "CoverQuality",
+   "EnemyBelief",
+   "AllyPresence",
+   "NoiseHeat",
+   "Visibility",
+   "ThreatExposure"
+  ],
+  "size": 32,
+  "cell_size": 1.25,
+  "frame": "agent-centred, world-axis-aligned",
+  "log1p_channels": [
+   "EnemyBelief",
+   "AllyPresence",
+   "NoiseHeat"
+  ]
+ },
+ "self_fields": [
+  "Health01",
+  "Ammo01",
+  "IsReloading",
+  "ReloadProgress01",
+  "Stance",
+  "Speed01",
+  "FacingSin",
+  "FacingCos",
+  "TimeSinceEnemySeen01",
+  "TimeSinceDamaged01",
+  "HasLineOfSight",
+  "VisibleEnemies01",
+  "AlliesAlive01",
+  "AllyAverageHealth01",
+  "TeamScore01",
+  "EnemyScore01",
+  "MatchTimeRemaining01",
+  "InCover01",
+  "NearestKnownEnemyDistance01",
+  "Suppression01",
+  "LastIntent01",
+  "IntentHoldTime01",
+  "DistanceToCenter01",
+  "InCenterZone"
+ ],
+ "masked_self_fields": [
+  "LastIntent01",
+  "IntentHoldTime01"
+ ],
+ "intents": [
+  "Hold",
+  "PushCoverForward",
+  "PushCoverFlank",
+  "Retreat",
+  "FlankLeft",
+  "FlankRight",
+  "Suppress",
+  "Peek",
+  "RegroupAlly",
+  "ContestCenter"
+ ],
+ "latent_dim": 128,
+ "probes": [
+  {
+   "name": "health",
+   "description": "Health01 now",
+   "display_only": false
+  },
+  {
+   "name": "in_cover",
+   "description": "InCover01 now",
+   "display_only": false
+  },
+  {
+   "name": "line_of_sight",
+   "description": "HasLineOfSight now",
+   "display_only": false
+  },
+  {
+   "name": "exposure",
+   "description": "ThreatExposure under the agent (grid centre 2x2) now",
+   "display_only": false
+  },
+  {
+   "name": "in_center",
+   "description": "InCenterZone now",
+   "display_only": false
+  },
+  {
+   "name": "hurt_soon",
+   "description": "loses health or dies within the next 1.0 s",
+   "display_only": false
+  },
+  {
+   "name": "death_soon",
+   "description": "dies within the next 2.0 s",
+   "display_only": false
+  },
+  {
+   "name": "round_won",
+   "description": "the agent's team wins this round (masked on draws)",
+   "display_only": false
+  },
+  {
+   "name": "pos_x",
+   "description": "world x, -20..20 m mapped to 0..1 (display only)",
+   "display_only": true
+  },
+  {
+   "name": "pos_z",
+   "description": "world z, -20..20 m mapped to 0..1 (display only)",
+   "display_only": true
+  }
+ ],
+ "position_probes": {
+  "x": "pos_x",
+  "z": "pos_z",
+  "world_metres": "(p - 0.5) * 2 * half_extent",
+  "half_extent": 20.0
+ },
+ "opset": 15,
+ "graphs": {
+  "encoder": {
+   "file": "encoder.onnx",
+   "inputs": {
+    "grid": [
+     -1,
+     7,
+     32,
+     32
+    ],
+    "self": [
+     -1,
+     24
+    ]
+   },
+   "outputs": {
+    "latent": [
+     -1,
+     128
+    ]
+   }
+  },
+  "predictor": {
+   "file": "predictor.onnx",
+   "inputs": {
+    "latent": [
+     -1,
+     128
+    ],
+    "intent": [
+     -1,
+     10
+    ]
+   },
+   "outputs": {
+    "next_latent": [
+     -1,
+     128
+    ]
+   }
+  },
+  "probes": {
+   "file": "probes.onnx",
+   "inputs": {
+    "latent": [
+     -1,
+     128
+    ]
+   },
+   "outputs": {
+    "probes": [
+     -1,
+     10
+    ]
+   }
+  },
+  "imagine": {
+   "file": "imagine.onnx",
+   "horizon": 15,
+   "inputs": {
+    "latent": [
+     1,
+     128
+    ],
+    "intents": [
+     -1,
+     15,
+     10
+    ]
+   },
+   "outputs": {
+    "probes": [
+     -1,
+     15,
+     10
+    ]
+   }
+  }
+ },
+ "checks": {
+  "encoder": {
+   "max_abs_error": 1.9073486328125e-06,
+   "ort_cpu_ms": 0.2726759999495698
+  },
+  "predictor": {
+   "max_abs_error": 7.152557373046875e-07,
+   "ort_cpu_ms": 0.238007000007201
+  },
+  "probes": {
+   "max_abs_error": 2.980232238769531e-07,
+   "ort_cpu_ms": 0.04923550004605204
+  },
+  "imagine": {
+   "max_abs_error": 9.5367431640625e-07,
+   "ort_cpu_ms": 1.1399065000296105
+  }
+ },
+ "evaluation": {
+  "rollout_ratio_to_copy": {
+   "1": 0.6573871284162945,
+   "2": 0.3791039583536516,
+   "3": 0.25420604044606465,
+   "4": 0.22975398173693573,
+   "5": 0.203171341169043,
+   "6": 0.18952303772542928,
+   "7": 0.19146469310136255,
+   "8": 0.18997755929574112,
+   "9": 0.200678060494345,
+   "10": 0.20689973961925853,
+   "11": 0.21591068093208357,
+   "12": 0.22324657439531764,
+   "13": 0.23142843923781461,
+   "14": 0.23709672212071373,
+   "15": 0.24242612383480755
+  },
+  "intent_id_accuracy": 0.85875,
+  "intent_id_balanced_accuracy": 0.6600420843590638,
+  "windows": 20000
+ }
+}

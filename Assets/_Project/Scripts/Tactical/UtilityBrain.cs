@@ -43,12 +43,30 @@ namespace JevNpcBrain.Tactical
             public float CommitmentBonus = 0.35f;
             public float MinCommitSeconds = 0.6f;
 
+            [Tooltip("Hold bonus while in contact with a loaded weapon. 0.5 is the calibrated baseline.")]
+            public float ContactHoldBonus = 0.5f;
+
             public static Weights Captain() => new Weights
             {
                 AggressionBias = 0.15f,
                 CommitmentBonus = 0.45f,
                 LostContactCuriosity = 0.7f
             };
+
+            /// <summary>
+            /// The control for JEV's first A/B win: the weapon spreads 3x wider on
+            /// the move (Weapon.MovingSpreadPenalty), JEV stands still to shoot,
+            /// and this is the one-line baseline fix anyone would try once they
+            /// had seen that -- Hold dominates while in contact and loaded, and
+            /// Retreat still takes over for the reload. A stronger control group,
+            /// not a different one: every other weight is the basis profile's.
+            /// </summary>
+            public static Weights StopToShoot(Weights basis)
+            {
+                var w = (Weights)basis.MemberwiseClone();
+                w.ContactHoldBonus = 2f;
+                return w;
+            }
         }
 
         private readonly Weights _w;
@@ -92,7 +110,7 @@ namespace JevNpcBrain.Tactical
                 0.30f
                 + s.CoverQualityHere * 0.8f
                 - s.ThreatExposureHere * _w.ExposurePenalty * 0.5f
-                + (inContact && !dry ? 0.5f : 0f)
+                + (inContact && !dry ? _w.ContactHoldBonus : 0f)
                 - (lost ? 0.3f : 0f),
                 s.CoverQualityHere > 0.6f ? "sheltered" : null);
 

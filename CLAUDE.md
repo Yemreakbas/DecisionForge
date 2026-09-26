@@ -1,7 +1,13 @@
-# JEV NPC Brain
+# DecisionForge (formerly JEV NPC Brain)
 
 An experimental game AI architecture using JEV as a tactical decision layer.
 **Traditional AI vs JEV vs Hybrid AI**, settled in an arena rather than argued.
+
+The project moved from `D:\Oyun Projelerim\Unity\JevNPCBrain` to
+`D:\Oyun Projelerim\Unity\DecisionForge` on 2026-09-25 and continues under the
+new name. Code namespaces (`JevNpcBrain.*`), `productName`, `JevCollector.exe`
+and the data/model schemas (`jev-dataset/1`, `jev-model/1`) keep the old name on
+purpose: renaming them buys nothing and the schemas are contracts.
 
 Unity **6000.6.0f1**. UnityMCP is registered for this project at
 `http://127.0.0.1:8080/mcp` — the Unity Editor must be open for it to respond.
@@ -123,6 +129,14 @@ to a training run.
 - Training will live in `Training/` and needs its own Python 3.12 venv
   (the machine default is 3.14, which PyTorch does not support yet)
 
+## Git commit rules
+
+- NEVER mention "Claude", "AI", or Anthropic in git commit messages or PR
+  descriptions. That includes this file's name and phrases like "game AI" --
+  say "project notes", "baseline brain".
+- DO NOT add "Co-authored-by: Claude" or any AI attribution headers.
+- Write conventional, standard commit messages (e.g. `feat: add user login endpoint`).
+
 ## Status
 
 **Phase 1 is complete and running.** Scene `Assets/_Project/Scenes/01_Octagon.unity`
@@ -130,7 +144,20 @@ plays a full Utility-vs-Utility match end to end: perception -> belief -> brain 
 reflex -> weapon -> damage -> round win -> metrics -> CSV in `MatchLogs/`.
 
 **Phase 2 is working (2026-09-25):** recording, headless collection and a
-validated first training set -- see "Phase 2: the dataset" below. Phase 3 is next.
+validated first training set -- see "Phase 2: the dataset" below.
+
+**Phase 3 is working (2026-09-25):** a JEPA world model trained, evaluated on a
+held-out run and exported to ONNX -- see "Phase 3: the world model" below.
+
+**Phase 4 is working (2026-09-25):** `JevBrain` plans over that model inside
+Unity, the SAFETY layer exists, and the first headless A/B is in -- see "Phase 4:
+JevBrain and the first A/B" below.
+
+**Phase 5 has its first answers (2026-09-26):** a held-out arena, "Warehouse",
+and the cross-arena numbers; then a third arena, "Divide", that no model has
+seen, and a world model trained on two arenas that generalises to it in play;
+then procedural arenas, where 26 layouts beat two offline but not in play --
+see "Phase 5: the held-out arena", "Phase 5b" and "Phase 5c" below.
 
 Scripts under `Assets/_Project/Scripts/`:
 
@@ -138,16 +165,17 @@ Scripts under `Assets/_Project/Scripts/`:
 |---|---|
 | `Core/` | `TacticalIntent`, `SelfState`, `NpcAgent` |
 | `Perception/` | `ObservationChannel`, `TacticalObservation`, `NoiseEvents`, `EnemyBelief`, `SensorGrid` |
-| `Tactical/` | `ITacticalBrain`, `UtilityBrain`, `ExploringBrain` (data collection only) |
+| `Tactical/` | `ITacticalBrain`, `UtilityBrain`, `ExploringBrain` (data collection only), `JevBrain`, `JevRuntime`, `JevModelAsset` |
+| `Safety/` | `ConstraintFilter` |
 | `Data/` | `DatasetRecorder`, `NpzWriter` (+ `Half16`) |
 | `Reflex/` | `ReflexMotor` |
 | `Combat/` | `Damageable`, `Weapon` |
 | `Arena/` | `ArenaLayout`, `ArenaBuilder` |
 | `Match/` | `MatchDirector`, `MatchMetrics` |
-| `Presentation/` | `AgentVisual`, `WeaponPose`, `WeaponModel`, `ThoughtOverlay`, `SpectatorCamera`, `AgentCameraRig`, `ArenaCameraRig`, `BroadcastCamera`, `CameraDirector`, `ActionFocus` |
+| `Presentation/` | `AgentVisual`, `WeaponPose`, `WeaponModel`, `ThoughtOverlay`, `SpectatorCamera`, `AgentCameraRig`, `ArenaCameraRig`, `BroadcastCamera`, `CameraDirector`, `ActionFocus`, `ImaginationTrails` |
 
 Editor-only: `Assets/_Project/Editor/CollectorBuild.cs` (menu **JEV > Build Data
-Collector**). Python lives in `Training/` (see phase 2 below).
+Collector**). Python lives in `Training/` (see phases 2 and 3 below).
 
 Scene objects: `Arena` (ArenaBuilder), `Match` (MatchDirector + ThoughtOverlay +
 CameraDirector; MatchMetrics is added at runtime), `Broadcast` (ArenaCameraRig),
@@ -390,10 +418,10 @@ Wide and the best tower. A kill cuts straight to the **killer's helmet cam** and
 holds through the respawn. Minimum hold 3.5 s, a cut for variety after 8 s.
 Towers are only picked when their fighter is not hidden behind cover.
 
-**Content caveat:** `JevBrain` does not exist yet (phase 4). A team set to
-`BrainKind.Jev` plays the utility baseline -- the console warns, but the HUD and
-the CSV still say "Jev". Footage from before phase 4 is Utility vs Utility and
-has to be labelled that way.
+**Content caveat:** before phase 4 (2026-09-25) a team set to `BrainKind.Jev`
+silently played the utility baseline while the HUD and the CSV said "Jev".
+Footage and CSVs from before then are Utility vs Utility and have to be labelled
+that way. Since phase 4 a Jev team without a `JevModel` throws instead.
 
 ### Phase 2: the dataset (started 2026-09-25)
 
@@ -439,7 +467,8 @@ resets the step so the editor does not stay in fixed time.
 - Headless: **JEV > Build Data Collector** once (writes `Builds/Collector/`, ~3
   min the first time, seconds after), then `.\Training\collect.ps1 -Instances 4
   -Rounds 500`. Flags the player understands: `-collect -rounds N -seed N
-  -format duel|squad -explore P -out DIR`. A player rather than batch-mode editor,
+  -format duel|squad -explore P -out DIR`, plus `-arena octagon|warehouse` (phase 5;
+  keep other arenas' runs out of `Datasets/`'s top level, or training picks them up). A player rather than batch-mode editor,
   because the editor locks the project. Headless skips `AgentVisual` and the
   camera rigs (nothing renders, no rule reads the body) and runs ~40-50x real
   time per instance: 4 instances played 400 rounds in 19 s. An exception in a
@@ -464,7 +493,8 @@ reach.
 `Datasets/` layout: one folder per run (exploring), `calibration/` (explore 0,
 pure baseline), `obsolete/`. `find_runs()` looks exactly one level down.
 
-`Training/.venv` is Python 3.12 (numpy only so far; torch arrives in phase 3).
+`Training/.venv` is Python 3.12 with numpy, torch 2.11 (CUDA 12.8), onnx and
+onnxruntime -- see `Training/requirements.txt`.
 `Training/jevdata.py` is the loader: `Run.open(folder)`, `run.shards()`,
 `shard.window_starts(horizon)` for rollout windows.
 
@@ -475,16 +505,444 @@ pure baseline), `obsolete/`. `find_runs()` looks exactly one level down.
 of steps. Every intent covers at least 1.5% of steps (ContestCenter 1.8%
 executed vs 0.1% from the baseline alone). Suppression01 is non-zero on 59%.
 
+### Phase 3: the world model (2026-09-25)
+
+`Training/`: `jevmodel.py` (encoder, predictor, probes), `jepa_data.py` (runs ->
+flat arrays + probe labels), `train_jepa.py`, `eval_jepa.py`, `export_onnx.py`.
+Checkpoints go to `Training/checkpoints/<name>/` (`model.pt` + `report.json`),
+ONNX to `Training/exports/<name>/`, logs to `Training/runs/` -- all git-ignored.
+
+```
+Training\.venv\Scripts\python Training\train_jepa.py --name NAME   # ~10 min
+Training\.venv\Scripts\python Training\eval_jepa.py [checkpoint]   # newest by default
+Training\.venv\Scripts\python Training\export_onnx.py [checkpoint]
+Training\.venv\Scripts\python Training\train_jepa.py --refit-probes Training\checkpoints\NAME
+```
+
+**Model.** Encoder: CNN over the 7x32x32 grid (log1p on EnemyBelief, AllyPresence
+and NoiseHeat, inside the graph) + MLP over the self vector -> 128-d latent,
+LayerNorm without affine (666K params). Predictor: residual MLP, (z, intent
+one-hot) -> z one 0.1 s tick later, same LayerNorm (411K). Probes: 128 -> 128 ->
+10 sigmoid heads (18K).
+
+**Training.** Stage 1, self-supervised: the online encoder reads obs_t, the
+predictor rolls through the executed intents for H = 15 ticks (1.5 s), and every
+step is regressed onto the EMA target encoder's latent of the real obs_t+k. EMA
+0.99 -> 0.999, VICReg variance/covariance terms on the online latents against
+collapse (latent std held at ~0.99). 12k steps x 256 windows, bf16, ~10 min on
+the RTX 4060 laptop GPU; the whole train set (3.3 GB fp16) lives on the GPU.
+Stage 2: probes fitted on frozen *target* latents -- the space the predictor
+lands in -- so the same heads can score an imagined future. No reward anywhere in
+stage 1; the probes are supervised, and that must be said when results are shown.
+
+**Split.** Validation is run seed 1004, seen by neither stage. Training is every
+other top-level run (seed101/102, 1001-1003: 230K steps).
+
+**The action echo is masked.** `LastIntent01` at t+1 equals intent_t in 100% of
+transitions, and `IntentHoldTime01` resets exactly on a switch, so the next
+latent would carry the action's own label and the predictor could "predict" it
+by copying. The encoder multiplies both by 0 (`jevmodel.ECHO_FIELDS`); the input
+stays 24 wide, so the observation contract and Unity are untouched. An
+intent-identification score from a model that sees these fields is inflated.
+
+**Results, `jepa_v1`, held out (seed 1004, 20K windows):**
+
+| k (ticks) | 1 | 2 | 5 | 10 | 15 |
+|---|---|---|---|---|---|
+| imagined MSE / copy MSE | 0.31 | 0.21 | 0.22 | 0.28 | 0.32 |
+
+"Copy" assumes nothing changes; the rollout is 3-5x closer to the real future
+across the whole 1.5 s.
+
+Intent identification (constant-intent windows; all ten intents rolled out, the
+one nearest the real future wins): accuracy 0.84, **balanced 0.60** against 0.10
+chance (majority class 0.57). Strong: PushCoverForward .90, Retreat .87,
+ContestCenter .84, FlankRight .79, Peek .78. Weak: Suppress .22, RegroupAlly .33
+(no allies in a duel), Hold .38, PushCoverFlank .42, FlankLeft .48. The
+FlankLeft/FlankRight gap is unexplained.
+
+Probes at t+1.5 s, read off the imagined latent, the real one (ceiling) and the
+latent at t (floor):
+
+| probe | imagined | ceiling | floor |
+|---|---|---|---|
+| health (MAE) | 0.125 | 0.047 | 0.160 |
+| exposure (MAE) | 0.134 | 0.072 | 0.173 |
+| line_of_sight (AUC) | 0.930 | 1.000 | 0.900 |
+| in_center (AUC) | 0.993 | 0.995 | 0.790 |
+| hurt_soon, next 1 s (AUC) | 0.810 | 0.843 | 0.621 |
+| death_soon, next 2 s (AUC) | 0.767 | 0.844 | 0.677 |
+| round_won (AUC) | 0.649 | 0.721 | 0.640 |
+| position x / z (m) | 1.25 / 1.54 | 1.06 / 1.29 | 1.75 / 3.54 |
+
+Every probe beats the floor. round_won barely does -- an even duel is decided by
+spread, so one state says little about the outcome; do not lean on it in scoring.
+
+**Position probes are display-only.** `pos_x`/`pos_z` learn `pos_xz` as a
+*target*, never an input, so the planner's rollouts can be drawn as ghost trails
+(~1.3-1.5 m error at 1.5 s). No planner score may use them; `model.json` marks
+them `display_only`.
+
+**ONNX, `Training/exports/jepa_v1/`** (opset 15, 6.2 MB, every graph checked
+against torch, max error 2.4e-6): `encoder`, `predictor`, `probes`, and
+`imagine` -- latent (1,128) + candidate intent sequences (N,15,10) one-hot ->
+probes (N,15,10), the planner's whole tick in one call. `model.json` is the
+contract (channel, self-field, intent and probe names in model order); JevBrain
+must compare it to its enums and refuse a mismatch. onnxruntime CPU: encoder
+0.22 ms, imagine with 10 candidates 1.18 ms -- roughly 150x the baseline's
+0.009 ms. The imagine graph is overhead-bound (tiny matmuls), so batching every
+agent's candidates into one call should cost little more than one agent.
+
+**Gotchas paid for in phase 3:**
+- The venv moved with the project. `Training\.venv\Scripts\python` works, but
+  `activate` and `pip.exe` still point at the old folder: use `python -m pip`.
+- torch comes from the cu128 index (see `requirements.txt`), not PyPI.
+- The legacy exporter (`dynamo=False`, needed for opset 15) rejects
+  `F.layer_norm(z, z.shape[-1:])` as a traced shape; pass the dim as an int.
+
+### Phase 4: JevBrain and the first A/B (2026-09-25)
+
+**Runtime.** `com.unity.ai.inference` 2.6.1. `Assets/_Project/Models/jepa_v1/`
+holds `encoder.onnx`, `imagine.onnx`, `model.json` and `JevModel.asset`
+(`JevModelAsset`: the two graphs plus the contract). `JevModelAsset.LoadContract`
+compares channel, self-field and intent names with the enums and throws on any
+difference. `JevRuntime` owns one encoder and one imagine worker for the whole
+match. Unity's output matches torch to 2.9e-6 on a recorded observation.
+
+**Planner (`JevBrain`).** Every tick: encode, imagine the ten intents each held
+for 15 ticks, score each future as a 0.93-discounted mean of
+`-1.5 death_soon - 0.75 hurt_soon - 0.25 exposure + 0.25 in_cover + 1.0 round_won
++ 0.1 in_center`, skip candidates the SAFETY layer vetoes, and keep the current
+intent unless another beats it by `CommitmentBonus` (0.08; captain 0.1) -- plus
+the baseline's 0.6 s minimum commitment. Weights live in `JevBrain.Weights` and
+are mirrored in `Training/plan_offline.py`, which runs the same scoring on
+held-out states to catch a degenerate weight set before a match is spent on it.
+Offline it chose nine different intents (Hold 19%, FlankRight 19%, Suppress 15%,
+...) against the baseline's 50% PushCoverForward.
+
+**SAFETY (`Safety/ConstraintFilter`)** runs in `NpcAgent.TacticalTick` after
+every brain's `Decide`, outside the timed region. Three vetoes: RegroupAlly with
+no allies, Suppress with nothing to fire, PushCoverForward/ContestCenter below
+25% health while exposed. Each fires on **0 of 119,151** recorded baseline
+decisions, so for UtilityBrain it is a no-op (a fourth rule, no advancing while
+reloading in contact, was dropped: it would have overridden 1.8% of them). A
+veto falls back to the brain's best allowed alternative. `JevBrain` consults the
+filter while choosing, so the post-decision override never fires for it; the
+CSV's `safety_vetoes` counts overrides only.
+
+**Ghost trails (`Presentation/ImaginationTrails`).** Added by MatchDirector when
+a team is Jev, not in batch mode and `ShowImagination` is on. Chosen future:
+bright team colour; rejected: thin, fading; vetoed: not drawn. Paths come from
+the display-only position probes as displacement from the first imagined step,
+anchored where the agent stood when it decided.
+
+**MatchDirector.** New fields `JevModel` (assigned in the scene), `ShowImagination`,
+`JevInference` (Auto = GPU compute when a graphics device exists, CPU otherwise).
+New flags: `-evaluate` (fixed step like `-collect`, no recording, quits when
+done, CSV tagged `_eval`), `-brainA jev|utility|stopshoot`, `-brainB ...`, and
+`-spreadpenalty X` (rules ablation for both teams, CSV tagged `_spreadX`;
+`evaluate.ps1 -SpreadPenalty X`). `BrainKind` gained `UtilityStopToShoot`
+(appended: the enum is serialized by value). Headless CSVs
+now carry `_seed<N>` so parallel instances cannot overwrite each other. **The
+scene keeps both teams on Utility on purpose**: the collector build reads the
+same scene, and a saved Jev team would silently turn `collect.ps1` runs into JEV
+data. Pick brains with the flags or in the Inspector without saving.
+
+**Running an A/B.** Build once (**JEV > Build Data Collector**), then
+`.\Training\evaluate.ps1 -Instances 4 -Rounds 100 [-Brain jev -Against utility]`.
+Half the instances put the tested brain on team A, half on B; the summary
+(`Training/summarize_matches.py`) pools them with a Wilson interval and a z-score
+and splits mirror matches by side. Logs: `Builds/Collector/EvalLogs/`; every
+round's ending is logged as `[Round] N elimination|timeout winner=...`.
+
+**Results, captain duel, Octagon, headless, 4 x 100 rounds each (same build):**
+
+| Matchup | Result | Notes |
+|---|---|---|
+| Utility vs Utility | A 201 - B 199 (50.2%, z = +0.10), 0 draws | the SAFETY layer did not unbalance the rig |
+| JEV vs JEV | A 204 - B 173 (54.1%, z = +1.60), 23 draws | inside noise (CI 49-59%) |
+| **JEV vs Utility** | **JEV 306 - 85 (78.3%, 95% CI 73.9-82.1%, z = +11.2)**, 9 draws | 78.5% as team A, 78.1% as team B |
+
+JEV vs Utility per round: K/D 292/76, first contact 262 vs 136, **dumb moments
+2.27 vs 0.92**, exposure 7.9 vs 7.8 s, centre 0.0 vs 0.2 s. Decision cost on the
+CPU backend in the player: **6.7 ms average** (first call ~120 ms, model
+warm-up) against the baseline's 0.004 ms and the 0.5 ms target.
+
+**Why JEV wins, as far as it is understood.** `Weapon.TryFire` spreads
+`1.2 + 2.5 x moveSpeed01` degrees, so standing still is about 3x as accurate
+as running. The baseline spends half its decisions walking to better cover and
+fights on the move; the planner imagined that standing and shooting in contact
+leads to fewer `hurt_soon`/`death_soon` futures, and it wins first contact
+262-136. Nobody wrote "stop to shoot" into either brain. The same behaviour is
+what the dumb-moment metric counts ("motionless, exposed, uncovered for 1.5 s"),
+so JEV wins while scoring 2.5x worse on the metric meant to measure what a
+player perceives. Report both halves; the claim under test is not yet
+supported, because it is about *fewer* dumb moments and about a different arena.
+
+**The controls settled it: the edge is the spread mechanic, not the planner.**
+Same build, 4 x 100 rounds each. `UtilityStopToShoot` is `UtilityBrain` with one
+weight changed (`ContactHoldBonus` 0.5 -> 2: hold while in contact and loaded);
+`-spreadpenalty 0` sets `Weapon.MovingSpreadPenalty` to 0 for both teams.
+
+| Matchup | Result |
+|---|---|
+| UtilityStopToShoot vs Utility | **79.5%** (318-82, z = +11.8) -- the one-line fix matches JEV's 78.3% |
+| **JEV vs UtilityStopToShoot** | **JEV 43.0%** (169-224, CI 38.2-47.9%, z = -2.77) -- JEV loses |
+| UtilityStopToShoot mirror | A 46.8% (187-213, z = -1.30) -- the stronger control is calibrated |
+| JEV vs Utility, spread penalty 0 | JEV 55.5% (218-175, CI 50.5-60.3%, z = +2.17) |
+| Utility mirror, spread penalty 0 | A 45.4% (181-218, z = -1.85) -- the rig's own swing under these rules |
+
+Reading: the world model found, from data alone, the one mechanic the baseline's
+author had missed -- and that is all the 78% was. A designer who knows the trick
+writes one line and beats JEV head to head. With the mechanic removed, JEV's
+residual 5.5 points are no larger than the mirror's own 4.6-point swing. The
+claim under test is **not supported** in-arena; what JEV did prove is that a
+world model is a working *discovery* tool for gaps in a hand-authored AI.
+(Under the ablation rules the SAFETY layer overrode the baseline once in 400
+rounds -- the "never fires on the baseline" check was made under the real rules.)
+
+**Honest limits.** Same arena as the training data (the generalisation clause
+is untested); one model, one weight set, a 1.5 s horizon and constant-intent
+candidates; the ablation runs a world model trained under the real rules; the
+cost is 13x over budget.
+
+**Metric bugs found and fixed while measuring (both pre-date phase 4):**
+- `RoundEnded?.Invoke(round, ResolveTimeout())` -- `?.` skips evaluating the
+  arguments when nobody listens, so in a headless `-evaluate` run (no recorder,
+  no cameras) timeout rounds were never counted. `-collect` and editor runs had
+  listeners, so the earlier calibrations are unaffected.
+- A same-frame trade (both sides wiped) counted as neither win nor draw; it is
+  a draw now. The 19-21 calibration had none.
+
+**Gotchas paid for in phase 4:**
+- In the editor the CPU backend is **~240 ms per decision**: Burst refuses to
+  compile Inference Engine jobs synchronously ("Synchronous compilation was
+  requested ... not allowed") and they run as managed code. GPU compute in the
+  editor: ~9-10 ms. A player build compiles Burst ahead of time: 6.7 ms on CPU.
+- CPU tensors can be read in place (`CompleteAllPendingOperations` +
+  `AsReadOnlySpan`); GPU tensors throw on that and need `DownloadToArray`.
+- `execute_menu_item` for the collector build times out after 30 s while the
+  build runs; wait for the `[CollectorBuild]` line in `Logs/Editor.log`.
+
+### Phase 5: the held-out arena (2026-09-26)
+
+**Warehouse** (`ArenaBuilder.Kind`, or `-arena warehouse` in a player;
+`evaluate.ps1 -Arena warehouse`). 40 x 40 m square; two 9 m shelves and two 7 m
+partitions that cut the floor into lanes; a pillar pair; a column on each spawn
+diagonal; twelve crates, two of them on the centre's rim; spawns in opposite
+corners. Every piece is placed as a pair through the origin -- occupancy checked
+cell by cell: 0 asymmetric cells. The scene stays on Octagon. CSVs of any other
+arena carry its name (`..._eval_Warehouse_...`).
+
+Two things the first Warehouse run exposed:
+- **Neither brain searches for an enemy it has never seen.** With no belief the
+  threat axis is the agent's own facing and both sit in the nearest cover. From
+  the true corners (44 m apart, beyond the 40 m `SightRange`) every round of a
+  smoke test ran out the clock without contact. Spawns are inset to 37 m. Octagon
+  never showed this because its spawns see each other across the open centre.
+- **`ArenaBuilder.Stamp` marks a cell only if its centre is inside the box**, and
+  centres sit at -19.375 + 1.25k. A 1.2 m wall centred between two of them stamps
+  nothing -- solid to physics, invisible to line of sight and to the observation.
+  Warehouse pieces are aligned to cell centres. Stamp itself was left alone:
+  changing it would change Octagon's observations under the trained model.
+
+Warehouse times out far more often (12% draws in JEV vs Utility) -- lanes make
+stalemates, and the timeout rule (centre, then health) decides those rounds.
+
+**Results, captain duel, 4 x 100 rounds each, same build:**
+
+| Matchup | Octagon | **Warehouse** | Delta |
+|---|---|---|---|
+| Utility mirror | 50.2% | 49.1% (z = -0.36) | rig fair |
+| StopToShoot mirror | 46.8% | 47.7% (z = -0.90) | rig fair |
+| JEV vs Utility | 78.3% | **74.6%** (CI 69.8-78.9) | -3.7 |
+| StopToShoot vs Utility | 79.5% | **59.1%** (CI 54.1-63.9) | **-20.4** |
+| JEV vs StopToShoot | 43.0% | **33.4%** (CI 28.7-38.5, z = -6.25) | **-9.6** |
+
+**The world model's imagination does not transfer; its reading of the present
+does.** `eval_jepa.py` on a Warehouse dataset (baseline + exploration, 200 rounds,
+`Datasets/warehouse/` -- one level down, so no training run picks it up):
+
+| | Octagon (seed 1004) | Warehouse |
+|---|---|---|
+| imagined / copy MSE, k = 1 / 5 / 15 | 0.31 / 0.22 / 0.32 | **1.12 / 1.12 / 1.10** |
+| intent id, balanced | 0.60 | 0.33 |
+| probes on the *current* latent: LoS AUC, death_soon AUC, health MAE | 1.00, 0.88, 0.04 | 0.998, 0.85, 0.07 |
+| probes on the *imagined* t+1.5 s latent vs copy floor | all beat the floor | most fall **below** the floor |
+
+In Warehouse the predictor's futures are worse than assuming nothing changes.
+
+**Reading.** Against the original baseline JEV's edge survives the new arena
+(-3.7) while the designer's one-line fix loses most of its edge (-20.4): the
+regularity JEV exploits (stand still to shoot) does not depend on the layout.
+Head to head the fix still beats JEV, by more in Warehouse -- whatever JEV did
+with its imagination in Octagon (positioning) came from dynamics that are
+specific to Octagon, and in Warehouse its planner is scoring futures that are
+worse than a copy of the present. The generalisation clause of the claim is
+therefore **half supported**: a learned tactic transferred better than a
+hand-written one, but the world model that was supposed to carry it did not.
+Intransitive results (JEV > Utility, StopToShoot > JEV, StopToShoot > Utility
+by less than JEV > Utility) are the norm in games; do not collapse them into one
+ranking.
+
+### Phase 5b: a third arena and a two-arena world model (2026-09-26)
+
+**Divide** (`-arena divide`): square; a full-height wall across the middle with
+a 3 m corridor at each side and a 12 m gap around the centre (its halves are
+staggered by one cell -- z = 0 is a cell boundary); spawns north/south, 34.7 m
+apart with a clear line through the gap. Point-symmetric, 0 asymmetric cells.
+Stalemate-prone: 88 of 400 Utility-mirror rounds were draws.
+
+**`jepa_v2`** = same architecture, trained on Octagon (seeds 101/102, 1001-1003)
+plus Warehouse (2101-2104): 370K steps, a 5.3 GB grid gathered per batch from
+RAM (`--gpu-data-gb`). Held out: Octagon 1004, Warehouse 2001, and all of Divide
+(`Datasets/divide/`, seed 3001), which no model has seen:
+`train_jepa.py --data Datasets Datasets/warehouse --val-seed 1004 2001 --name jepa_v2`.
+In Unity it sits in `MatchDirector.AlternativeJevModels`; pick it with
+`-jevmodel jepa_v2` (`evaluate.ps1 -JevModel jepa_v2`). CSV labels name the
+model: `Jev:jepa_v1`, `Jev:jepa_v2`.
+
+Offline, imagined/copy MSE at k = 5 and balanced intent id:
+
+| | Octagon | Warehouse | Divide |
+|---|---|---|---|
+| v1 (Octagon only) | 0.22, 0.60 | 1.12, 0.33 | 1.14, 0.35 |
+| v2 (Octagon + Warehouse) | 0.22, 0.66 | 0.54, 0.65 | **1.14, 0.36** |
+
+Matches, 4 x 100 rounds each, win rate of the first brain over decided rounds:
+
+| | Octagon | Warehouse | **Divide (unseen)** |
+|---|---|---|---|
+| JEV v1 vs Utility | 78.3 | 74.6 | 61.7 |
+| **JEV v2 vs Utility** | -- | -- | **79.1** (CI 74.7-82.8) |
+| StopToShoot vs Utility | 79.5 | 59.1 | 71.8 |
+| JEV v1 vs StopToShoot | 43.0 | 33.4 | 27.8 |
+| **JEV v2 vs StopToShoot** | 38.4 | **47.3** (z = -1.0, a tie) | **38.0** |
+| Utility mirror | 50.2 | 49.1 | 51.6 (88 draws) |
+
+**Reading.** One extra training arena lifted JEV in the arena that was added
+(+13.9 against StopToShoot, now level with it) *and in the arena no model had
+seen* (+10.2 against StopToShoot, +17.4 against Utility), at no significant
+cost in Octagon (-4.6, intervals overlap). In Divide, v2 against the old
+baseline matches what v1 managed in its own training arena, and beats the
+designer's fix against the same baseline (79.1 vs 71.8) -- the generalisation
+clause, measured the way the claim states it. The one-line fix still wins head
+to head in two arenas of three.
+
+**The offline metric missed it.** Imagined-vs-copy MSE on Divide did not move
+between v1 and v2 (1.14 both), yet v2 plays 10-17 points better there. The
+planner never needs an accurate latent, only the candidates' futures in the
+right *order*. The metric to add is a ranking one: does the imagined ordering
+of intents agree with what actually followed?
+
+**Gotchas paid for here:**
+- A dirty open scene stops `BuildPipeline.BuildPlayer` on a modal "Scene(s) Have
+  Been Modified" dialog that nobody driving the editor over MCP can see; the
+  build then just never starts. `CollectorBuild` now refuses to build a dirty
+  scene and says so in the log.
+- Collection after phase 4 runs exploratory detours through the SAFETY filter:
+  1,300+ overrides per team per 200 Divide rounds (random RegroupAlly in a
+  duel, Suppress while dry). The recorded intent is the executed one, so the
+  data is consistent, but its exploration mix differs from phase 2's Octagon data.
+- 32 GB RAM holds one two-arena training run, not a second big load next to it
+  (a 1.5 GB allocation failed while jepa_v2 trained).
+
+### Phase 5c: procedural arenas (2026-09-26)
+
+**`ArenaKind.Procedural`** (`-arena procedural -layoutseed N`, arena name
+`Proc<N>`): a seeded layout built from whole-cell pieces -- walls 4-8 x 1 cells,
+2 x 2 blocks, 1 x 1 pillars (full height), 2 x 1 crates (crouch) -- every piece
+with its twin through the origin. A piece is only placed if it keeps a cell of
+floor around it, stays 3 m from every spawn and clear of the centre, leaves the
+two captains a line of sight at spawn, and leaves every spawn reachable from
+every other (4-connected flood fill). N/S or diagonal spawns, 6-11 pairs, both
+from the seed. Checked on seeds 1, 2, 3, 7, 11, 42: 0 asymmetric cells, captain
+line of sight every time. `collect.ps1 -Arena procedural -FirstLayoutSeed N`
+gives instance i layout N + i.
+
+`Datasets/procedural/`: layouts 101-124, 30 rounds each, 277K steps
+(3.8K-26.5K per layout: some layouts fight at once, some stall).
+
+**Score fidelity** (`eval_jepa.py`, new): the planner's own score of the
+executed intents, computed from the imagined future and from the real one,
+Spearman-correlated across windows. Unlike latent MSE it follows play:
+
+| Spearman | Octagon | Warehouse | Divide |
+|---|---|---|---|
+| v1 | 0.905 | 0.837 | 0.823 |
+| v2 | 0.889 | 0.894 | 0.835 |
+
+Same ordering as the matches in every arena (v1 ahead in Octagon, v2 in
+Warehouse and Divide), though the Divide gap is small next to the 10-point gap
+in play. The decision itself ranks *candidates within one state*, which offline
+data cannot score: only the executed intent's future was ever observed.
+
+**`jepa_v3`**: trained on Octagon + Warehouse + the 24 procedural layouts (640K
+steps, 16K updates, grid memory-mapped), validation seeds 1004, 2001 and 4124
+(Proc124, held out). Divide still unseen. `MatchDirector.AlternativeJevModels`
+holds v2 and v3; `-jevmodel jepa_v3`.
+
+Offline on Divide it is the best of the three -- imagined/copy MSE at k = 5
+0.98 (v1, v2: 1.14), intent id 0.44 (0.35, 0.36), score fidelity 0.864
+(0.823, 0.835) -- and in play it is not:
+
+| JEV vs StopToShoot | Octagon | Warehouse | Divide |
+|---|---|---|---|
+| v1 (1 arena) | 43.0 | 33.4 | 27.8 |
+| **v2 (2 arenas)** | 38.4 | **47.3** | **38.0** |
+| v3 (26 arenas) | 34.5 (41 draws) | 47.1 (**126 draws**) | 32.3 |
+| JEV vs Utility, Divide | v1 61.7 | **v2 79.1** | v3 72.3 |
+
+v3 plays more passively: a third of its Warehouse rounds ran out the clock.
+Many procedural layouts are stalemate-prone (their episodes are long and
+contact-poor), and a world model fed mostly on them learns that waiting is
+safe -- which the planner, whose `in_center` weight is 0.1 and which has no term
+for the timeout rule, then acts on. **More arenas is not automatically better;
+what the arenas teach matters.** And the offline metrics, all computed on the
+baseline's own trajectories, ranked v3 first: they cannot see a planner that
+steers into states the data never covered, nor a within-state ranking of
+candidates that were never tried.
+
+**Gotcha: the scene is marked dirty with no change.** Twice the open scene was
+flagged dirty right after a save, with the in-memory copy byte-identical to
+the file (saved as a copy under Temp and diffed). A build of a dirty scene stops
+on a modal dialog, so `CollectorBuild` refuses instead; save and build in the
+same editor call when driving it over MCP.
+
+**Gotcha: the Windows commit limit, not RAM.** With 10.5 GB of physical memory
+free, only 5.6 GB could still be committed, so a 9 GB `np.empty` for the grid
+fails. `jepa_data.load(..., memmap_path=...)` puts grids above 4 GB in a
+memory-mapped .npy (`Training/cache/`, git-ignored): file-backed pages do not
+count against commit, and the OS still caches them in free RAM.
+
 ### Next up
 
-1. Phase 3: JEPA encoder + action-conditioned predictor in PyTorch (install torch
-   into `Training/.venv`), trained on `window_starts(horizon)` rollouts, then
-   export ONNX. Open design question before the planner exists: training has no
-   reward, so the planner still needs a way to score an imagined latent (e.g.
-   small probes for health, exposure and line of sight trained on top of the
-   frozen encoder).
-2. Squad-format data (`-format squad`) once the duel model works.
-
-Still unbuilt from phase 1's original list: nothing blocking, but the planned
-`Safety/ConstraintFilter` veto layer does not exist yet -- add it before any
-learned brain is allowed to drive.
+1. **On-policy data.** Collect with JEV playing (`-collect -brainA jev`, both
+   sides and against StopToShoot) and retrain: the classic model-based loop,
+   aimed at exactly the gap above -- states the planner steers into and the
+   baseline's data never covered. v2 is the starting point, not v3.
+2. **Curate the arenas, do not just add them.** Reject stalemate-prone
+   procedural layouts (e.g. measure time to first contact in a short headless
+   run) or weight data by contact; then retry the many-arena model.
+3. **Within-state ranking**: only matches measure it today. Replaying recorded
+   states with each candidate forced for 1.5 s in a headless player would give
+   counterfactual data -- to score world models offline and to train them.
+4. **Decide the control group.** "The baseline is not a strawman" now points at
+   `UtilityStopToShoot`: it is one weight away from the old baseline, calibrated
+   (46.8% mirror) and beats both the old baseline and JEV. Every later JEV
+   number should be quoted against it. The old baseline stays as the
+   "what the designer first wrote" reference.
+5. **Make JEV earn a win** against StopToShoot outside Warehouse. Levers,
+   cheapest first: a planner that can switch intent mid-rollout (switch-at-k
+   candidates), a longer horizon, a term for the timeout rule (v3's draws), a
+   learned value instead of hand-picked probe weights.
+6. **Search behaviour.** Neither brain looks for an enemy it has never seen; any
+   arena whose spawns are out of sight of each other stalls. That is a gap in the
+   shared action space (no "search" intent), not in either brain.
+7. Cost: 6.7 ms per decision. Batch every JEV agent into one imagine call, a
+   shorter horizon, fewer candidates, or a hand-written Burst MLP.
+8. Dumb moments: the winning behaviour ("stand and shoot") is what the metric
+   counts. Decide whether it should -- as it stands the metric penalises
+   UtilityStopToShoot (3.1 per round in Octagon) harder than anyone.
+9. Squad-format data (`-format squad`) and a retrain; RegroupAlly and
+   AllyPresence are dead in duel data.

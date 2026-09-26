@@ -8,6 +8,7 @@ namespace JevNpcBrain.Core
     using Combat;
     using Perception;
     using Reflex;
+    using Safety;
     using Tactical;
 
     /// <summary>
@@ -64,6 +65,12 @@ namespace JevNpcBrain.Core
 
         /// <summary>Wall-clock cost of the last Decide call. Published, not hidden.</summary>
         public float LastDecisionMilliseconds { get; private set; }
+
+        /// <summary>Why the safety layer overrode the last decision, or null if it did not.</summary>
+        public string LastVeto { get; private set; }
+
+        /// <summary>How often the safety layer has overridden this agent's brain.</summary>
+        public int Vetoes { get; private set; }
 
         public bool IsAlive => Health != null && Health.IsAlive;
         public Vector3 EyePosition => Eye != null ? Eye.position : transform.position + Vector3.up * 1.5f;
@@ -152,6 +159,12 @@ namespace JevNpcBrain.Core
             var intent = Brain.Decide(Observation);
             _stopwatch.Stop();
             LastDecisionMilliseconds = (float)_stopwatch.Elapsed.TotalMilliseconds;
+
+            // SAFETY: the hard-rule veto, identical for every brain and outside the
+            // timed region -- it is part of the shared body, not the brain's bill.
+            intent = ConstraintFilter.Apply(intent, Observation, Brain.LastScores, out var veto);
+            LastVeto = veto;
+            if (veto != null) Vetoes++;
 
             if (intent != CurrentIntent) _intentChangedAt = now;
             CurrentIntent = intent;

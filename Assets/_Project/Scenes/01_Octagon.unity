@@ -326,6 +326,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31a74ae5259b63b44b72dbff3df4eb95, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JevNpcBrain.Arena.ArenaBuilder
+  Kind: 0
+  LayoutSeed: 1
   Radius: 20
   WallHeight: 4
   CenterZoneRadius: 4
@@ -508,6 +510,13 @@ MonoBehaviour:
   Format: 0
   TeamABrain: 0
   TeamBBrain: 0
+  JevModel: {fileID: 11400000, guid: 9829d02f9d029cc43ac20a0313450712, type: 2}
+  AlternativeJevModels:
+  - {fileID: 11400000, guid: fab840864baeabd46a2c33b4e9175ae7, type: 2}
+  - {fileID: 11400000, guid: 9ceac141ff91b8c4c942fb7e60680df2, type: 2}
+  ShowImagination: 1
+  MovingSpreadOverride: -1
+  JevInference: 0
   CharacterPrefab: {fileID: 7978103059706897167, guid: 7f718c68bcde77f469b8a027e2bd378c, type: 3}
   WeaponPrefab: {fileID: 5156342059461535119, guid: caee25efb3fc1894a9105fa15937ebc3, type: 3}
   EnableAdvancedMovement: 0
