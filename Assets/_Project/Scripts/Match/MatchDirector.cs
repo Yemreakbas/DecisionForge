@@ -288,8 +288,12 @@ namespace JevNpcBrain.Match
             }
         }
 
-        /// <summary>A Jev label names its model: two checkpoints are two different brains.</summary>
-        private string BrainLabel(BrainKind kind)
+        /// <summary>
+        /// A Jev label names its model: two checkpoints are two different brains.
+        /// Used by the CSV and by the dataset's run.json, so a recorded run says
+        /// which world model was playing.
+        /// </summary>
+        public string BrainLabel(BrainKind kind)
         {
             string label = kind == BrainKind.Jev && _jevRuntime != null
                 ? "Jev:" + _jevRuntime.Contract.checkpoint

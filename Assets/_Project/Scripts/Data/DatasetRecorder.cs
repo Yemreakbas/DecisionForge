@@ -324,8 +324,8 @@ namespace JevNpcBrain.Data
             json.Append("  \"unity_version\": ").Append(Quote(Application.unityVersion)).Append(",\n");
             json.Append("  \"arena\": ").Append(Quote(layout != null ? layout.Name : "?")).Append(",\n");
             json.Append("  \"format\": ").Append(Quote(_match.Format.ToString())).Append(",\n");
-            json.Append("  \"brains\": [").Append(Quote(_match.TeamABrain.ToString())).Append(", ")
-                .Append(Quote(_match.TeamBBrain.ToString())).Append("],\n");
+            json.Append("  \"brains\": [").Append(Quote(_match.BrainLabel(_match.TeamABrain))).Append(", ")
+                .Append(Quote(_match.BrainLabel(_match.TeamBBrain))).Append("],\n");
             json.Append("  \"seed\": ").Append(_match.Seed.ToString(c)).Append(",\n");
             json.Append("  \"tick_hz\": ").Append(tickHz.ToString("R", c)).Append(",\n");
             json.Append("  \"sim_step_seconds\": ").Append(Time.captureDeltaTime.ToString("R", c)).Append(",\n");

@@ -23,7 +23,12 @@ param(
     [ValidateSet("octagon", "warehouse", "divide", "procedural")][string]$Arena = "octagon",
     # Procedural only: instance i builds layout FirstLayoutSeed + i, so one call
     # collects as many different arenas as it has instances.
-    [int]$FirstLayoutSeed = 1
+    [int]$FirstLayoutSeed = 1,
+    # Who plays. The scene's default is utility vs utility; on-policy data for a
+    # world model comes from -BrainA jev (-JevModel picks the checkpoint).
+    [ValidateSet("utility", "jev", "stopshoot")][string]$BrainA = "utility",
+    [ValidateSet("utility", "jev", "stopshoot")][string]$BrainB = "utility",
+    [string]$JevModel = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,6 +52,8 @@ for ($i = 0; $i -lt $Instances; $i++) {
     $arguments = "-batchmode -nographics -collect -rounds $Rounds -seed $seed -format $Format " +
                  "-arena $Arena -explore $exploreText -out `"$Out`" -logFile `"$log`""
     if ($Arena -eq "procedural") { $arguments += " -layoutseed $($FirstLayoutSeed + $i)" }
+    $arguments += " -brainA $BrainA -brainB $BrainB"
+    if ($JevModel -ne "") { $arguments += " -jevmodel $JevModel" }
 
     $process = Start-Process -FilePath $exe -ArgumentList $arguments -PassThru -WindowStyle Hidden
     # Touching the handle now is what makes ExitCode readable once the process ends.
