@@ -17,8 +17,10 @@ The held-out run (default: seed 1004) never touches either stage.
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -266,6 +268,19 @@ def main():
     save_checkpoint(out / "model.pt", model, {"info": info})
     write_report(out, info, reports, log)
     print(f"saved {out}")
+
+    # The memory-mapped grid is only a training cache (8.6 GB for jepa_v3).
+    # Windows refuses to delete a file that is still mapped, so drop the
+    # mapping first, and leave the file if that is not enough.
+    cache = getattr(train.grid, "filename", None)
+    if cache:
+        del train
+        gc.collect()
+        try:
+            os.remove(cache)
+            print(f"removed grid cache {cache}")
+        except OSError as e:
+            print(f"left grid cache {cache}: {e}")
 
 
 if __name__ == "__main__":
