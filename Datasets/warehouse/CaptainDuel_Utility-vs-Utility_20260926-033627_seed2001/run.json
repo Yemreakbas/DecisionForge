@@ -1,0 +1,19 @@
+{
+  "schema": "jev-dataset/1",
+  "created_utc": "2026-09-26T00:36:27Z",
+  "unity_version": "6000.6.0f1",
+  "arena": "Warehouse",
+  "format": "CaptainDuel",
+  "brains": ["Utility", "Utility"],
+  "seed": 2001,
+  "tick_hz": 10,
+  "sim_step_seconds": 0.0166666675,
+  "exploration": {"start_chance_per_decision": 0.012, "min_seconds": 0.8, "max_seconds": 3},
+  "grid": {"channels": ["ObstacleHeight", "CoverQuality", "EnemyBelief", "AllyPresence", "NoiseHeat", "Visibility", "ThreatExposure"], "size": 32, "cell_size": 1.25, "layout": "CHW", "frame": "agent-centred, world-axis-aligned", "dtype": "float16"},
+  "self_fields": ["Health01", "Ammo01", "IsReloading", "ReloadProgress01", "Stance", "Speed01", "FacingSin", "FacingCos", "TimeSinceEnemySeen01", "TimeSinceDamaged01", "HasLineOfSight", "VisibleEnemies01", "AlliesAlive01", "AllyAverageHealth01", "TeamScore01", "EnemyScore01", "MatchTimeRemaining01", "InCover01", "NearestKnownEnemyDistance01", "Suppression01", "LastIntent01", "IntentHoldTime01", "DistanceToCenter01", "InCenterZone"],
+  "intents": ["Hold", "PushCoverForward", "PushCoverFlank", "Retreat", "FlankLeft", "FlankRight", "Suppress", "Peek", "RegroupAlly", "ContestCenter"],
+  "episode_end": ["survived", "died", "cut"],
+  "debug_only": ["pos_xz"],
+  "complete": true,
+  "totals": {"rounds": 200, "shards": 17, "episodes": 400, "steps": 73111}
+}
