@@ -104,3 +104,12 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Python training side (phase 3+)
+Training/.venv/
+__pycache__/
+*.pyc
+Training/checkpoints/
+Training/runs/
+Training/exports/
+Training/cache/
