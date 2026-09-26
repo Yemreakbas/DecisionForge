@@ -514,6 +514,7 @@ MonoBehaviour:
   AlternativeJevModels:
   - {fileID: 11400000, guid: fab840864baeabd46a2c33b4e9175ae7, type: 2}
   - {fileID: 11400000, guid: 9ceac141ff91b8c4c942fb7e60680df2, type: 2}
+  - {fileID: 11400000, guid: 6a35a40441b5c1a4ebaf6e6ba386202e, type: 2}
   ShowImagination: 1
   MovingSpreadOverride: -1
   JevInference: 0
