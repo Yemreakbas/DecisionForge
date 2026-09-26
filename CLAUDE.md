@@ -156,8 +156,9 @@ JevBrain and the first A/B" below.
 **Phase 5 has its first answers (2026-09-26):** a held-out arena, "Warehouse",
 and the cross-arena numbers; then a third arena, "Divide", that no model has
 seen, and a world model trained on two arenas that generalises to it in play;
-then procedural arenas, where 26 layouts beat two offline but not in play --
-see "Phase 5: the held-out arena", "Phase 5b" and "Phase 5c" below.
+then procedural arenas, where 26 layouts beat two offline but not in play;
+then an on-policy loop that beat UtilityStopToShoot 65.5% in Warehouse and lost
+transfer to the unseen arena -- see "Phase 5", "Phase 5b", "5c" and "5d" below.
 
 Scripts under `Assets/_Project/Scripts/`:
 
@@ -594,8 +595,16 @@ must compare it to its enums and refuse a mismatch. onnxruntime CPU: encoder
 agent's candidates into one call should cost little more than one agent.
 
 **Gotchas paid for in phase 3:**
-- The venv moved with the project. `Training\.venv\Scripts\python` works, but
-  `activate` and `pip.exe` still point at the old folder: use `python -m pip`.
+- The venv was recreated in place on 2026-09-26 (`python -m venv Training/.venv`
+  over the existing folder rewrites the launcher and `pyvenv.cfg` and keeps
+  site-packages), so `activate` and `pip` now point at this folder.
+- **Do not check out a commit older than `8055304` with the venv on disk.** That
+  commit untracked `Training/.venv`; moving across it makes git overwrite the
+  ignored venv from the old tree and then delete every file the old tree held
+  (python.exe, pyvenv.cfg, numpy, pip). It happened once, on a branch switch and
+  fast-forward. Repair: `python -m venv Training/.venv`, then
+  `Training\.venv\Scripts\python -m pip install numpy` -- torch and onnx, added
+  later, survive.
 - torch comes from the cu128 index (see `requirements.txt`), not PyPI.
 - The legacy exporter (`dynamo=False`, needed for opset 15) rejects
   `F.layer_norm(z, z.shape[-1:])` as a traced shape; pass the dim as an int.
@@ -915,12 +924,42 @@ fails. `jepa_data.load(..., memmap_path=...)` puts grids above 4 GB in a
 memory-mapped .npy (`Training/cache/`, git-ignored): file-backed pages do not
 count against commit, and the OS still caches them in free RAM.
 
+### Phase 5d: the on-policy loop (2026-09-26)
+
+`Datasets/onpolicy/`: JEV v2 (with exploration) against UtilityStopToShoot,
+4 x 100 rounds in Octagon (seeds 6101-6104) and in Warehouse (6201-6204), 315K
+steps. `collect.ps1` now takes `-BrainA/-BrainB/-JevModel`, and run.json's
+`brains` names the model (`Jev:jepa_v2+explore`). **`jepa_v4`** = v2's data plus
+this, validation seeds 1004, 2001, 6104; Divide unseen. `train_jepa.py` now
+deletes its memory-mapped grid cache when it is done.
+
+| JEV vs StopToShoot | Octagon | Warehouse | Divide (unseen) |
+|---|---|---|---|
+| v1 (1 arena) | 43.0 | 33.4 | 27.8 |
+| **v2 (2 arenas)** | 38.4 | 47.3 | **38.0** |
+| v3 (26 arenas) | 34.5 | 47.1 | 32.3 |
+| **v4 (v2 + on-policy)** | 37.6 | **65.5** (CI 60.5-70.2, z = +5.97) | 26.5 |
+| JEV vs Utility, Divide | v1 61.7 | v2 79.1 | v3 72.3 / v4 72.9 |
+
+**JEV beat the stronger baseline for the first time** -- in Warehouse, where it
+had played that opponent on-policy: 243-128. Offline, v4 looked like v2.
+**And the specialisation cost generalisation:** in unseen Divide v4 fell to
+26.5 against StopToShoot (v2 38.0, z ~ 3.5), and it gained nothing in Octagon,
+where it had also played on-policy. In the open Octagon a firefight is two
+stand-and-shoot brains trading shots, which leaves a planner little to plan;
+Warehouse's lanes reward the positioning JEV imagines.
+
+So the picture after five phases: **a learned planner can out-play a tuned
+hand-written brain where it has learned the arena and the opponent, and cannot
+yet where it has not.** The generalisation clause of the claim is the open
+problem, and each recipe so far trades one side for the other.
+
 ### Next up
 
-1. **On-policy data.** Collect with JEV playing (`-collect -brainA jev`, both
-   sides and against StopToShoot) and retrain: the classic model-based loop,
-   aimed at exactly the gap above -- states the planner steers into and the
-   baseline's data never covered. v2 is the starting point, not v3.
+1. **On-policy over many arenas.** v4 shows on-policy data wins where it is
+   collected; v2 shows a second arena buys transfer; v3 shows arena choice
+   matters. The combination -- JEV collecting on-policy across a curated set of
+   arenas, retrained each round -- is the recipe that targets both sides at once.
 2. **Curate the arenas, do not just add them.** Reject stalemate-prone
    procedural layouts (e.g. measure time to first contact in a short headless
    run) or weight data by contact; then retry the many-arena model.
@@ -932,9 +971,9 @@ count against commit, and the OS still caches them in free RAM.
    (46.8% mirror) and beats both the old baseline and JEV. Every later JEV
    number should be quoted against it. The old baseline stays as the
    "what the designer first wrote" reference.
-5. **Make JEV earn a win** against StopToShoot outside Warehouse. Levers,
-   cheapest first: a planner that can switch intent mid-rollout (switch-at-k
-   candidates), a longer horizon, a term for the timeout rule (v3's draws), a
+5. **Win where JEV has not practised.** It now wins where it played on-policy
+   (Warehouse). Planner levers that do not depend on data: switch-at-k
+   candidates, a longer horizon, a term for the timeout rule (v3's draws), a
    learned value instead of hand-picked probe weights.
 6. **Search behaviour.** Neither brain looks for an enemy it has never seen; any
    arena whose spawns are out of sight of each other stalls. That is a gap in the
